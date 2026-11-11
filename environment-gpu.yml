@@ -1,0 +1,14 @@
+name: musclesinaction-gpu
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch==2.7.1+cu128
+      - torchvision==0.22.1+cu128
+      - numpy==1.26.4
+      - matplotlib>=3.7,<4
+      - python-benedict==0.28.3
+      - tqdm>=4.64,<5
