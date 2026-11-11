@@ -2,7 +2,9 @@ import numpy as np
 import pdb
 import torch
 import musclesinaction.configs.args as args
-import musclesinaction.vis.logvis as logvis
+import inspect
+import json
+import logging
 import musclesinaction.dataloader.data as data
 import time
 import os
@@ -86,11 +88,13 @@ class NearestNeighbor(object):
 
         return Ypred
 
+@torch.no_grad()
 def main(args, logger):
 
-    logger.info()
+    logger.info('')
     logger.info('torch version: ' + str(torch.__version__))
-    logger.save_args(args)
+    with open(os.path.join(args.log_path, 'args_inference.json'), 'w') as handle:
+        json.dump(vars(args), handle, indent=2)
     
 
     np.random.seed(args.seed)
@@ -124,7 +128,11 @@ def main(args, logger):
 
     if args.resume:
         logger.info('Loading weights from: ' + args.resume)
-        checkpoint = torch.load(args.resume, map_location='cpu')
+        load_options = {'map_location': 'cpu'}
+        if 'weights_only' in inspect.signature(torch.load).parameters:
+            # The project's trusted checkpoint also contains an argparse Namespace.
+            load_options['weights_only'] = False
+        checkpoint = torch.load(args.resume, **load_options)
         my_model.load_state_dict(checkpoint['my_model'])
         start_epoch = checkpoint['epoch'] + 1
     else:
@@ -132,6 +140,7 @@ def main(args, logger):
 
     device = torch.device(args.device)
     my_model.to(device)
+    my_model.eval()
 
 
 
@@ -181,8 +190,8 @@ def main(args, logger):
     gtemg = np.concatenate(list_of_val_emg,axis=0)
     predemg = np.concatenate(list_of_pred_emg,axis=0)
     msel = torch.nn.MSELoss()
-    pdb.set_trace()
-    print(torch.sqrt(msel(torch.tensor(gtemg),torch.tensor(predemg))))
+    rmse = torch.sqrt(msel(torch.tensor(gtemg), torch.tensor(predemg))).item()
+    logger.info('RMSE: ' + str(rmse))
 
     #list_of_results.append(msel(torch.tensor(ypred)*100,torch.tensor(np_val_emg)*100).numpy())
     #list_of_resultsnn.append(msel(torch.tensor(np_pred_emg)*100,torch.tensor(np_val_emg)*100).numpy())
@@ -212,7 +221,14 @@ if __name__ == '__main__':
     args = args.inference_args()
     args.bs = 1
 
-    logger = logvis.MyLogger(args, args, context='train')
+    os.makedirs(args.log_path, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[logging.FileHandler(os.path.join(args.log_path, args.name + '.log')),
+                  logging.StreamHandler()],
+    )
+    logger = logging.getLogger(__name__)
 
     try:
 
@@ -223,6 +239,7 @@ if __name__ == '__main__':
         logger.exception(e)
 
         logger.warning('Shutting down due to exception...')
+        raise
 
 
 #TEST SKELETON MATRIX FLATTENED OVER TIME
