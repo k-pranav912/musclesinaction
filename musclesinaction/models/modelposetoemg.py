@@ -120,7 +120,7 @@ class TransformerEnc(nn.Module):
         #condition = self.embedding(condval)
         #condition = condition.repeat(1,30,1)
         condition = condition*condval.reshape(condval.shape[0],1,1)
-        srccat = torch.cat([src,condition.type(torch.cuda.FloatTensor)],dim=2)
+        srccat = torch.cat([src, condition.to(device=src.device, dtype=src.dtype)], dim=2)
         #newsrc = torch.cat([src,newcond],dim=2)
         
         # We could use the parameter batch_first=True, but our KDL version doesn't support it yet, so we permute
